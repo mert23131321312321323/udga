@@ -1,0 +1,232 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>UDGA - Canlı Deprem İzleme ve Analiz Sistemi</title>
+
+    <!-- SEO & Meta -->
+    <meta name="description"
+        content="Türkiye ve Dünya genelindeki son depremleri anlık takip edin. Kandilli ve USGS verileriyle canlı harita, etki alanı analizi ve tarihsel deprem arşivi.">
+    <meta name="keywords"
+        content="deprem, earthquake, canlı deprem, kandilli, son depremler, deprem haritası, türkiye deprem">
+    <meta name="author" content="UDGA">
+
+    <!-- Mobile & PWA Settings -->
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0d1117">
+    <meta name="mobile-web-app-capable" content="yes"> <!-- Fix for deprecation warning -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/5618/5618479.png">
+
+    <!-- Open Graph (Social Sharing) -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="UDGA - Ulusal Deprem Gözlem Ağı">
+    <meta property="og:description"
+        content="Anlık deprem takibi, gelişmiş analizler ve tarihsel veri arşivi. Harita üzerinde canlı izleyin.">
+    <meta property="og:image" content="https://cdn-icons-png.flaticon.com/512/5618/5618479.png"> <!-- Geçici görsel -->
+    <meta property="og:url" content="https://deprem-monitor.glitch.me">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="UDGA - Canlı Deprem Takip">
+    <meta name="twitter:description" content="Türkiye ve dünyadaki depremleri anlık analiz edin.">
+    <meta name="twitter:image" content="https://cdn-icons-png.flaticon.com/512/5618/5618479.png">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header>
+        <div class="brand-container">
+            <div class="brand-main">
+                <div class="pulse-icon"></div>
+                <h1 class="brand-title">
+                    <span class="brand-acronym">
+                        <span class="letter-u">U</span><span class="letter-d">D</span><span
+                            class="letter-g">G</span><span class="letter-a">A</span>
+                    </span>
+                    <span class="brand-title-full">Ulusal Deprem Gözlem Ağı</span>
+                </h1>
+            </div>
+            <div class="brand-subtitle">CBS Tabanlı Deprem İzleme ve Analiz Sistemi</div>
+        </div>
+
+        <button id="mobile-toggle" aria-label="Liste">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+            </svg>
+        </button>
+
+        <!-- Location Button (Top Right, Next to Mobile Toggle or in Map) -->
+        <!-- Biz bunu harita kontrolü gibi sağ alta, zoom'un üstüne koyalım -->
+    </header>
+
+    <main>
+        <!-- Filtreler -->
+        <!-- Filtreler (Sol Üst - Açılır/Kapanır) -->
+        <div id="filter-panel" class="filter-panel">
+            <div id="filter-header" class="filter-header">
+                <span class="filter-icon">⚡</span>
+                <span class="filter-title">FİLTRELER</span>
+                <span id="filter-toggle-icon" class="filter-toggle-icon">▼</span>
+            </div>
+
+            <div id="filter-content" class="filter-content">
+                <div class="filter-row">
+                    <span class="filter-label">Zaman</span>
+                    <div class="filter-buttons">
+                        <button class="filter-btn active" data-filter="24h">24s</button>
+                        <button class="filter-btn" data-filter="7d">7g</button>
+                        <button class="filter-btn" data-filter="30d">30g</button>
+                    </div>
+                </div>
+
+                <div class="filter-divider-hz"></div>
+
+                <div class="filter-row">
+                    <span class="filter-label">Büyüklük: <strong id="mag-val"
+                            style="color:var(--accent-color)">0.0</strong>+</span>
+                    <input type="range" id="mag-slider" min="0.0" max="9.0" step="0.5" value="0.0">
+                </div>
+            </div>
+        </div>
+
+        <!-- Harita Alanı -->
+        <div id="map"></div>
+
+        <!-- Yan Panel (Liste) -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h3>Son Depremler</h3>
+                <div class="sidebar-controls">
+                    <div class="sidebar-controls">
+                        <!-- Custom Searchable Dropdown -->
+                        <div class="custom-select-wrapper" id="custom-select-wrapper">
+                            <div class="custom-select-trigger" id="custom-select-trigger">
+                                <span id="trigger-text">Tüm Dünyada</span>
+                                <span class="arrow">▼</span>
+                            </div>
+                            <div class="custom-options-container" id="custom-options-container">
+                                <div class="search-box">
+                                    <input type="text" id="country-search" placeholder="Ülke Ara..." autocomplete="off">
+                                </div>
+                                <div class="options-list" id="options-list">
+                                    <!-- JS ile dolacak -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="quake-list" class="quake-list">
+                <!-- Deprem listesi buraya JS ile dolacak -->
+                <div style="padding:20px; text-align:center; color:#8b949e">Yükleniyor...</div>
+            </div>
+
+            <div class="stats-bar">
+                <div class="stat-item">
+                    Toplam: <strong id="total-quakes">-</strong>
+                </div>
+                <div class="stat-item">
+                    Son Güncelleme: <strong id="last-updated">-</strong>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Location Alert Container -->
+        <div id="alert-container" class="alert-container"></div>
+    </main>
+
+    <!-- Welcome Modal -->
+    <div id="welcome-modal-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>👋 UDGA'ya Hoş Geldiniz</h2>
+                <button id="modal-close-btn" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-intro"><strong>Ulusal Deprem Gözlem Ağı (UDGA)</strong>, dünya genelindeki deprem
+                    aktivitelerini anlık olarak izlemenizi ve analiz etmenizi sağlayan yeni nesil bir platformdur.</p>
+
+                <h3 class="modal-section-title">🚀 Öne Çıkan Özellikler</h3>
+                <ul class="modal-features-list">
+                    <li>
+                        <span class="feature-icon">🌍</span>
+                        <div>
+                            <strong>Canlı Deprem Takibi</strong>
+                            <p>USGS ve Kandilli verileri ile anlık deprem bildirimleri.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">🔍</span>
+                        <div>
+                            <strong>Akıllı Filtreleme</strong>
+                            <p>Ülke bazlı odaklanma ve gelişmiş arama seçenekleri.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">📉</span>
+                        <div>
+                            <strong>Tarihi Veriler</strong>
+                            <p>Son 100 yılın en yıkıcı depremlerini haritada inceleyin.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">🧪</span>
+                        <div>
+                            <strong>Etki Alanı Simülatörü</strong>
+                            <p>Haritada herhangi bir noktada deprem simülasyonu çalıştırın.</p>
+                        </div>
+                    </li>
+                </ul>
+
+                <div class="modal-footer-note">
+                    <p>Başlamak için bir ülke seçebilir veya haritayı keşfedebilirsiniz.</p>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <label class="modal-dont-show">
+                    <input type="checkbox" id="dont-show-again">
+                    <span>Bir daha gösterme</span>
+                </label>
+                <button id="modal-start-btn" class="modal-btn-primary">Keşfetmeye Başla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script imports allow map rendering and functionality -->
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Turf.js for Spatial Queries -->
+    <!-- Turf.js for Spatial Queries (Local) -->
+    <script src="turf.min.js"></script>
+
+    <!-- MarkerCluster (Local) -->
+    <link rel="stylesheet" href="libs/MarkerCluster.css" />
+    <link rel="stylesheet" href="libs/MarkerCluster.Default.css" />
+    <script src="libs/leaflet.markercluster.js"></script>
+
+    <!-- App JS -->
+    <script src="app.js"></script>
+</body>
+
+</html>
